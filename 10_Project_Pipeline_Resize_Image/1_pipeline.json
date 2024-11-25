@@ -1,0 +1,53 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "GetFileType",
+  "States": {
+    "GetFileType": {
+      "Type": "Pass",
+      "Next": "CheckFileType"
+    },
+    "CheckFileType": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.results.fileType",
+          "StringEquals": "png",
+          "Next": "ProcessFile"
+        }
+      ],
+      "Default": "DeleteSourceFile"
+    },
+    "DeleteSourceFile": {
+      "Type": "Pass",
+      "End": true
+    },
+    "ProcessFile": {
+      "Type": "Parallel",
+      "Next": "WriteToDynamoDB",
+      "Branches": [
+        {
+          "StartAt": "CopyToDestination",
+          "States": {
+            "CopyToDestination": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Resize_Image",
+          "States": {
+            "Resize_Image": {
+              "Type": "Pass",
+              "End": true
+            }
+          }
+        }
+      ]
+    },
+    "WriteToDynamoDB": {
+      "Type": "Pass",
+      "Next": "DeleteSourceFile"
+    }
+  }
+}

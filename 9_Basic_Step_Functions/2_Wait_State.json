@@ -1,0 +1,18 @@
+{
+  "Comment": "A description of my state machine",
+  "StartAt": "WaitForSometime",
+  "States": {
+    "WaitForSometime": {
+      "Comment": "wait state",
+      "Type": "Wait",
+      "Seconds": 5,
+      "Next": "HelloWorld"
+    },
+    "HelloWorld": {
+      "Comment": "Hello World Step",
+      "Type": "Pass",
+      "Result": "Hello World",
+      "End": true
+    }
+  }
+}

@@ -1,0 +1,143 @@
+{
+    "Comment": "A description of my state machine",
+    "StartAt": "GetFileType",
+    "States": {
+      "GetFileType": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:471112977094:function:get_file_type_function",
+        "TimeoutSeconds": 10,
+        "ResultPath":"$.results.fileType",
+        "Next": "CheckFileType",
+        "Catch":[
+          {
+            "ErrorEquals": ["State.ALL"],
+            "Next" : "QuitMain"
+          }
+        ]
+      },
+      "CheckFileType": {
+        "Type": "Choice",
+        "Choices": [
+          {
+            "Variable": "$.results.fileType",
+            "StringEquals": "png",
+            "Next": "ProcessFile"
+          }
+        ],
+        "Default": "DeleteSourceFile"
+      },
+      "DeleteSourceFile": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:471112977094:function:delete_file_function",
+        "ResultPath": "$.results.deletionStatus",
+        "End": true,
+        "Catch":[
+          {
+            "ErrorEquals": ["State.ALL"],
+            "Next" : "QuitMain"
+          }
+        ]
+      },
+      "ProcessFile": {
+        "Type": "Parallel",
+        "Next": "WriteToDynamoDB",
+        "ResultPath":"$.results.images",
+        "Branches": [
+          {
+            "StartAt": "CopyToDestination",
+            "States": {
+              "CopyToDestination": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:us-east-1:471112977094:function:copy_file_function",
+                "TimeoutSeconds": 10,
+                "ResultPath": "$.image.original",
+                "OutputPath": "$.image",
+                "End": true,
+                "Retry":[
+                  {
+                    "ErrorEquals":["State.ALL,State.Timeout"],
+                    "IntervalSeconds": 5,
+                    "MaxAttempts": 2,
+                    "BackoffRate":2
+                  },
+                  {
+                    "ErrorEquals":["State.TaskFailed"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 2,
+                    "BackoffRate":2
+                  }
+                ],
+                "Catch":[
+                  {
+                    "ErrorEquals":["State.ALL"],
+                    "Next": "QuitCopy"
+                  }
+                ]
+              },
+              "QuitCopy":{
+                "Type": "Fail",
+                "Error":"Copy Error",
+                "Cause": "An error occur while executing the Copy State"
+              }
+            }
+          },
+          {
+            "StartAt": "Resize_Image",
+            "States": {
+              "Resize_Image": {
+                "Type": "Task",
+                "Resource": "arn:aws:lambda:us-east-1:471112977094:function:image_resize_function",
+                "TimeoutSeconds": 10,
+                "ResultPath": "$.image.resized",
+                "OutputPath": "$.image",
+                "End": true,
+                "Retry":[
+                  {
+                    "ErrorEquals":["State.ALL,State.Timeout"],
+                    "IntervalSeconds": 5,
+                    "MaxAttempts": 2,
+                    "BackoffRate":2
+                  },
+                  {
+                    "ErrorEquals":["State.TaskFailed"],
+                    "IntervalSeconds": 2,
+                    "MaxAttempts": 2,
+                    "BackoffRate":2
+                  }
+                ],
+                "Catch":[
+                  {
+                    "ErrorEquals":["State.ALL"],
+                    "Next": "QuitResize"
+                  }
+                ]
+              },
+              "QuitResize":{
+                "Type": "Fail",
+                "Error":"Resize Error",
+                "Cause": "An error occur while executing the Resize State"
+              }
+            }
+          }
+        ]
+      },
+      "WriteToDynamoDB": {
+        "Type": "Task",
+        "Resource": "arn:aws:lambda:us-east-1:471112977094:function:write_to_dynamobDB_function",
+        "ResultPath":"$.results.WriteStatus",
+        "Next": "DeleteSourceFile",
+        "Catch":[
+          {
+            "ErrorEquals": ["State.ALL"],
+            "Next" : "QuitMain"
+          }
+        ]
+  
+      },
+      "QuitMain":{
+        "Type": "Fail",
+        "Error": "GenericError",
+        "Cause": "An error occur while executing the state machine"
+      }
+    }
+  }
